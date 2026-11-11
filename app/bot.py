@@ -5,6 +5,7 @@ import asyncio
 import logging
 import os
 
+from app.downloads import cleanup_download_cache
 from app.rubika.client import RubikaClient
 from app.rubika.handlers import handle_update
 
@@ -17,6 +18,8 @@ MAX_ACTIVE_HANDLERS = max(2, int(os.getenv("MAX_ACTIVE_HANDLERS", "8")))
 
 
 async def run() -> None:
+    removed = cleanup_download_cache()
+    logger.info("Startup cleanup removed %d abandoned download job(s).", removed)
     client = RubikaClient()
     offset_id: str | None = None
     handler_slots = asyncio.Semaphore(MAX_ACTIVE_HANDLERS)
