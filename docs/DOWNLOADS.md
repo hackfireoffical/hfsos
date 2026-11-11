@@ -1,6 +1,6 @@
 # Downloads and Rubika delivery
 
-HackFire Gateway downloads files only from URLs returned by supported provider APIs and only over HTTPS from an explicit host allowlist. The downloader streams to a unique per-job directory, enforces `MAX_DOWNLOAD_SIZE_MB`, verifies Modrinth SHA-512 values when provided, and removes temporary files after delivery. Download requests are limited per chat and globally bounded.
+HackFire Gateway downloads files only from URLs returned by supported provider APIs and only over HTTPS from an explicit host allowlist. The downloader streams to a unique per-job directory, enforces `MAX_DOWNLOAD_SIZE_MB`, verifies Modrinth SHA-512 values when provided, and deletes the original file plus all split parts immediately after the delivery attempt finishes (success or failure). There is no persistent file cache. Download requests are limited per chat and globally bounded. On bot startup, a safety sweep removes abandoned UUID job folders older than `DOWNLOAD_ORPHAN_MAX_AGE_SECONDS` (default: one hour), covering forced restarts or power loss.
 
 ## Rubika file delivery
 
