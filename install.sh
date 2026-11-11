@@ -62,8 +62,8 @@ fi
 chmod 600 .env
 
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
-chown root:root .env
-chmod 600 .env
+chown root:"$SERVICE_USER" .env
+chmod 640 .env
 
 cat > /etc/systemd/system/hackfire-gateway-bot.service <<UNIT
 [Unit]
