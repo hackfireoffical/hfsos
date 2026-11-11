@@ -131,6 +131,10 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
                 part.unlink(missing_ok=True)
         if path is not None:
             path.unlink(missing_ok=True)
+            try:
+                path.parent.rmdir()
+            except OSError:
+                pass
 
 
 
