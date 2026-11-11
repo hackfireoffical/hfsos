@@ -112,3 +112,42 @@ def split_for_rubika(path: Path) -> list[Path]:
         for part in parts:
             part.unlink(missing_ok=True)
         raise
+
+def cleanup_download_cache(max_age_seconds: int = 3600) -> int:
+    """Delete abandoned UUID job directories older than the retention window.
+
+    Completed deliveries are removed immediately by the handler. This sweep is
+    a safety net for VPS restarts, forced termination, or interrupted uploads.
+    """
+    import shutil
+    import time
+
+    root = Path(os.getenv("DOWNLOAD_DIR", "data/downloads")).resolve()
+    if not root.exists():
+        return 0
+    now = time.time()
+    removed = 0
+    for entry in root.iterdir():
+        if not entry.is_dir() or not re.fullmatch(r"[0-9a-f]{32}", entry.name):
+            continue
+        try:
+            if now - entry.stat().st_mtime >= max(60, max_age_seconds):
+                shutil.rmtree(entry)
+                removed += 1
+        except FileNotFoundError:
+            continue
+        except OSError:
+            continue
+    return removed
+
+
+def cleanup_job_directory(path: Path | None) -> None:
+    """Remove a completed download's private job directory immediately."""
+    import shutil
+
+    if path is None:
+        return
+    try:
+        shutil.rmtree(path.parent)
+    except FileNotFoundError:
+        pass
