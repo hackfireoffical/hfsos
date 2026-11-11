@@ -1,7 +1,6 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from app.downloads import (
     DELIVERY_PART_SIZE, RUBIKA_FILE_LIMIT, is_allowed_asset_url, safe_filename, split_for_rubika,
