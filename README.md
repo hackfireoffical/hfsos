@@ -65,4 +65,6 @@ Public Invidious and Piped instances are third-party services and can disappear 
 - Keep the real `.env` file out of Git.
 - Never paste bot tokens or API keys into issues, commits, screenshots, or chat.
 - Do not expose the API publicly without authentication and rate limiting.
-\n\nDownload behavior and Rubika file-delivery details: [docs/DOWNLOADS.md](docs/DOWNLOADS.md).\n
+
+
+Download behavior and Rubika file-delivery details: [docs/DOWNLOADS.md](docs/DOWNLOADS.md).
