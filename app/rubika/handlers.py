@@ -6,7 +6,7 @@ import hashlib
 import os
 import time
 
-from app.downloads import download_asset, split_for_rubika
+from app.downloads import cleanup_job_directory, download_asset, split_for_rubika
 from app.providers import curseforge, github, modrinth, youtube
 from app.rubika.client import RubikaClient
 
@@ -129,12 +129,7 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
         for part in parts_to_send:
             if path is not None and part != path:
                 part.unlink(missing_ok=True)
-        if path is not None:
-            path.unlink(missing_ok=True)
-            try:
-                path.parent.rmdir()
-            except OSError:
-                pass
+        cleanup_job_directory(path)
 
 
 
