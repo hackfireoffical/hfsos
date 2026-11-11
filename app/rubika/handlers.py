@@ -88,8 +88,7 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
                 return
             url, filename, expected_sha512 = chosen.get("url"), chosen.get("filename"), chosen.get("sha512")
         elif source == "curseforge" and len(parts) == 4:
-            files = await curseforge.list_files(int(parts[2]), limit=50)
-            chosen = next((item for item in files if str(item.get("id")) == parts[3]), None)
+            chosen = await curseforge.get_file(int(parts[2]), int(parts[3]))
             if not chosen or not chosen.get("download_url"):
                 await client.send_message(chat_id, "That CurseForge file is unavailable for direct download.")
                 return
