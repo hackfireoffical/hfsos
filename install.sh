@@ -15,7 +15,7 @@ command -v apt-get >/dev/null 2>&1 || fail "This installer supports Ubuntu/Debia
 log "Installing system packages..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git curl ca-certificates python3 python3-venv python3-pip build-essential
+apt-get install -y git curl ca-certificates python3 python3-venv python3-pip build-essential supervisor
 
 if [[ -d "$APP_DIR/.git" ]]; then
   log "Updating existing checkout..."
@@ -65,7 +65,8 @@ chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
 chown root:"$SERVICE_USER" .env
 chmod 640 .env
 
-cat > /etc/systemd/system/hackfire-gateway-bot.service <<UNIT
+if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+  cat > /etc/systemd/system/hackfire-gateway-bot.service <<UNIT
 [Unit]
 Description=HackFire Gateway Rubika Bot
 Wants=network-online.target
@@ -91,7 +92,7 @@ ReadWritePaths=$APP_DIR/data
 WantedBy=multi-user.target
 UNIT
 
-cat > /etc/systemd/system/hackfire-gateway-api.service <<UNIT
+  cat > /etc/systemd/system/hackfire-gateway-api.service <<UNIT
 [Unit]
 Description=HackFire Gateway Local API
 Wants=network-online.target
@@ -119,14 +120,53 @@ ReadWritePaths=$APP_DIR/data
 WantedBy=multi-user.target
 UNIT
 
-systemctl daemon-reload
-systemctl enable --now hackfire-gateway-bot.service
-systemctl enable --now hackfire-gateway-api.service
+  systemctl daemon-reload
+  systemctl enable --now hackfire-gateway-bot.service
+  systemctl enable --now hackfire-gateway-api.service
+  log "Services installed with systemd."
+  printf '\nBot status: systemctl status hackfire-gateway-bot\n'
+  printf 'API status: systemctl status hackfire-gateway-api\n'
+  printf 'Bot logs:   journalctl -u hackfire-gateway-bot -f\n'
+else
+  log "systemd is unavailable; configuring Supervisor instead..."
+  mkdir -p /etc/supervisor/conf.d
+  cat > /etc/supervisor/conf.d/hackfire-gateway.conf <<UNIT
+[program:hackfire-gateway-bot]
+command=$APP_DIR/.venv/bin/python -m app.bot
+directory=$APP_DIR
+user=$SERVICE_USER
+environment=HOME="$APP_DIR",PYTHONDONTWRITEBYTECODE="1"
+autostart=true
+autorestart=true
+startsecs=5
+stopasgroup=true
+killasgroup=true
+redirect_stderr=true
+stdout_logfile=/var/log/hackfire-gateway-bot.log
 
-log "Installation finished."
-printf '\nBot status: systemctl status hackfire-gateway-bot\n'
-printf 'API status: systemctl status hackfire-gateway-api\n'
-printf 'Bot logs:   journalctl -u hackfire-gateway-bot -f\n'
+[program:hackfire-gateway-api]
+command=$APP_DIR/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+directory=$APP_DIR
+user=$SERVICE_USER
+environment=HOME="$APP_DIR",HOST="127.0.0.1",PORT="8000",PYTHONDONTWRITEBYTECODE="1"
+autostart=true
+autorestart=true
+startsecs=5
+stopasgroup=true
+killasgroup=true
+redirect_stderr=true
+stdout_logfile=/var/log/hackfire-gateway-api.log
+UNIT
+  if ! supervisorctl pid >/dev/null 2>&1; then
+    supervisord -c /etc/supervisor/supervisord.conf
+  fi
+  supervisorctl reread
+  supervisorctl update
+  log "Services installed with Supervisor."
+  printf '\nService status: supervisorctl status\n'
+  printf 'Bot logs:       tail -f /var/log/hackfire-gateway-bot.log\n'
+fi
+
 printf 'API health: curl http://127.0.0.1:8000/health\n'
 printf 'App path:   %s\n' "$APP_DIR"
 printf '\nKeep port 8000 private. Do not expose the API publicly without authentication.\n'
