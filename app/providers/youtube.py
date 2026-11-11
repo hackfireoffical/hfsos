@@ -95,7 +95,8 @@ async def _piped_instances(client: httpx.AsyncClient) -> list[str]:
     response = await client.get("https://piped-instances.kavin.rocks/")
     response.raise_for_status()
     urls, seen = [], set()
-    for item in response.json() if isinstance(response.json(), list) else []:
+    payload = response.json()
+    for item in payload if isinstance(payload, list) else []:
         candidate = _https_url(item.get("api_url")) if isinstance(item, dict) and item.get("is_api") else None
         if candidate and candidate not in seen:
             urls.append(candidate)
