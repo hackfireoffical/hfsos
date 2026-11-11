@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -41,9 +42,11 @@ async def download_asset(url: str, filename: str, expected_sha512: str | None = 
         raise DownloadError("The provider returned an unsupported download host.")
     root = Path(os.getenv("DOWNLOAD_DIR", "data/downloads")).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    target = root / safe_filename(filename)
+    job_dir = root / uuid.uuid4().hex
+    job_dir.mkdir(mode=0o700)
+    target = job_dir / safe_filename(filename)
     temporary = target.with_suffix(target.suffix + ".part")
-    max_bytes = int(os.getenv("MAX_DOWNLOAD_SIZE_MB", "512")) * 1024 * 1024
+    max_bytes = max(1, int(os.getenv("MAX_DOWNLOAD_SIZE_MB", "512"))) * 1024 * 1024
     digest = hashlib.sha512()
     total = 0
     timeout = httpx.Timeout(90.0, connect=15.0)
@@ -82,6 +85,8 @@ async def download_asset(url: str, filename: str, expected_sha512: str | None = 
         return target
     except Exception:
         temporary.unlink(missing_ok=True)
+        target.unlink(missing_ok=True)
+        job_dir.rmdir()
         raise
 
 
@@ -91,14 +96,19 @@ def split_for_rubika(path: Path) -> list[Path]:
     if size <= RUBIKA_FILE_LIMIT:
         return [path]
     parts: list[Path] = []
-    with path.open("rb") as source:
-        index = 1
-        while True:
-            data = source.read(DELIVERY_PART_SIZE)
-            if not data:
-                break
-            part = path.with_name(f"{path.name}.part{index:03d}")
-            part.write_bytes(data)
-            parts.append(part)
-            index += 1
-    return parts
+    try:
+        with path.open("rb") as source:
+            index = 1
+            while True:
+                data = source.read(DELIVERY_PART_SIZE)
+                if not data:
+                    break
+                part = path.with_name(f"{path.name}.part{index:03d}")
+                part.write_bytes(data)
+                parts.append(part)
+                index += 1
+        return parts
+    except Exception:
+        for part in parts:
+            part.unlink(missing_ok=True)
+        raise
