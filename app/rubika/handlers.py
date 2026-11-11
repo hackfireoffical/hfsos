@@ -14,7 +14,7 @@ from app.rubika.client import RubikaClient
 logger = logging.getLogger("hackfire.handlers")
 
 WELCOME = (
-    "🔥 HackFire Gateway\\n\\n"
+    "🔥 HackFire Gateway\n\n"
     "Choose a service below. You can also type /help for command examples."
 )
 
@@ -72,9 +72,9 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
     if len(parts) < 3:
         await client.send_message(
             chat_id,
-            "Choose a download from a search result, or use one of these formats:\\n"
-            "/download github owner/repo [asset-number]\\n"
-            "/download modrinth project-slug\\n"
+            "Choose a download from a search result, or use one of these formats:\n"
+            "/download github owner/repo [asset-number]\n"
+            "/download modrinth project-slug\n"
             "/download curseforge project-id file-id",
             inline_keypad=back_keypad(),
         )
@@ -127,8 +127,8 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
         if len(parts_to_send) > 1:
             await client.send_message(
                 chat_id,
-                f"📦 {path.name} exceeds Rubika's 50 MB limit. Sending {len(parts_to_send)} numbered parts.\\n"
-                f"Join the parts in order to restore the original file.\\nSHA-256: {digest}",
+                f"📦 {path.name} exceeds Rubika's 50 MB limit. Sending {len(parts_to_send)} numbered parts.\n"
+                f"Join the parts in order to restore the original file.\nSHA-256: {digest}",
             )
         for index, part in enumerate(parts_to_send, 1):
             caption = f"{path.name} · part {index}/{len(parts_to_send)}" if len(parts_to_send) > 1 else path.name
@@ -168,13 +168,13 @@ async def _search(client: RubikaClient, chat_id: str, provider: str, query: str)
             results = await github.search_repositories(query, 5)
             lines = []
             for item in results:
-                lines.append(f"🐙 {item['full_name']}\\n⭐ {item['stars']} · {item.get('language') or 'Unknown'}\\n{item['url']}")
+                lines.append(f"🐙 {item['full_name']}\n⭐ {item['stars']} · {item.get('language') or 'Unknown'}\n{item['url']}")
                 rows.append([(f"Release: {item['full_name']}"[:40], f"release:{item['full_name']}")])
         elif provider == "modrinth":
             results = await modrinth.search_projects(query, limit=5)
             lines = []
             for item in results:
-                lines.append(f"🟢 {item['title']} ({item['project_type']})\\n⬇️ {item['downloads']:,} downloads\\n{item['url']}")
+                lines.append(f"🟢 {item['title']} ({item['project_type']})\n⬇️ {item['downloads']:,} downloads\n{item['url']}")
                 rows.append([(f"Versions: {item['title']}"[:40], f"versions:{item['slug']}"),
                              (f"Download: {item['title']}"[:40], f"dlmod:{item['slug']}")])
         elif provider == "curseforge":
@@ -188,13 +188,13 @@ async def _search(client: RubikaClient, chat_id: str, provider: str, query: str)
             results = await curseforge.search_projects(query, limit=5)
             lines = []
             for item in results:
-                lines.append(f"🟠 {item['name']}\\nID: {item['id']} · ⬇️ {item['downloads']:,} downloads\\n{item.get('website_url') or item['slug']}")
+                lines.append(f"🟠 {item['name']}\nID: {item['id']} · ⬇️ {item['downloads']:,} downloads\n{item.get('website_url') or item['slug']}")
                 rows.append([(f"Files: {item['name']}"[:40], f"cfiles:{item['id']}")])
         elif provider == "youtube":
             payload = await youtube.search_videos(query, 5)
             results = payload["results"]
             lines = [
-                f"▶️ {item.get('title') or 'Untitled'}\\n{item.get('channel') or 'Unknown channel'}\\n{item.get('url') or ''}"
+                f"▶️ {item.get('title') or 'Untitled'}\n{item.get('channel') or 'Unknown channel'}\n{item.get('url') or ''}"
                 for item in results
             ]
         else:
@@ -205,7 +205,7 @@ async def _search(client: RubikaClient, chat_id: str, provider: str, query: str)
             return
         keypad_rows = rows[:8]
         keypad_rows.append([("🏠 Main menu", "menu:home")])
-        await client.send_message(chat_id, ("\\n\\n".join(lines))[:3900], inline_keypad=_keypad(keypad_rows))
+        await client.send_message(chat_id, ("\n\n".join(lines))[:3900], inline_keypad=_keypad(keypad_rows))
     except Exception as exc:
         logger.exception("%s search failed", provider)
         if provider == "youtube" and isinstance(exc, RuntimeError):
@@ -231,7 +231,7 @@ async def _show_release(client: RubikaClient, chat_id: str, repository: str) -> 
             lines.append(f"📦 {index}. {asset['name']} · {size_mb:.1f} MB")
             rows.append([(f"⬇️ Download #{index}", f"dlgh:{repository}:{index}")])
         rows.append([("🏠 Main menu", "menu:home")])
-        await client.send_message(chat_id, "\\n".join(lines)[:3900], inline_keypad=_keypad(rows))
+        await client.send_message(chat_id, "\n".join(lines)[:3900], inline_keypad=_keypad(rows))
     except Exception as exc:
         logger.exception("Release lookup failed")
         await client.send_message(chat_id, f"⚠️ Release lookup failed ({type(exc).__name__}).", inline_keypad=back_keypad())
@@ -244,10 +244,10 @@ async def _show_versions(client: RubikaClient, chat_id: str, slug: str) -> None:
             await client.send_message(chat_id, "No versions found.", inline_keypad=back_keypad())
             return
         lines = [
-            f"🟢 {item['version_number']} — {', '.join(item['loaders']) or 'Any loader'}\\nMC: {', '.join(item['game_versions'][:5])}"
+            f"🟢 {item['version_number']} — {', '.join(item['loaders']) or 'Any loader'}\nMC: {', '.join(item['game_versions'][:5])}"
             for item in versions
         ]
-        await client.send_message(chat_id, "\\n\\n".join(lines)[:3900], inline_keypad=_keypad([
+        await client.send_message(chat_id, "\n\n".join(lines)[:3900], inline_keypad=_keypad([
             [("⬇️ Download latest", f"dlmod:{slug}")],
             [("🏠 Main menu", "menu:home")],
         ]))
@@ -266,11 +266,11 @@ async def _show_curseforge_files(client: RubikaClient, chat_id: str, project_id:
         for item in found:
             name = item.get("display_name") or item.get("file_name")
             size = (item.get("file_length") or 0) / 1048576
-            lines.append(f"🟠 {name}\\nID: {item['id']} · {size:.1f} MB")
+            lines.append(f"🟠 {name}\nID: {item['id']} · {size:.1f} MB")
             if item.get("download_url"):
                 rows.append([(f"⬇️ {name}"[:40], f"dlcf:{project_id}:{item['id']}")])
         rows.append([("🏠 Main menu", "menu:home")])
-        await client.send_message(chat_id, "\\n\\n".join(lines)[:3900], inline_keypad=_keypad(rows[:9]))
+        await client.send_message(chat_id, "\n\n".join(lines)[:3900], inline_keypad=_keypad(rows[:9]))
     except Exception as exc:
         logger.exception("CurseForge file lookup failed")
         await client.send_message(chat_id, f"⚠️ File lookup failed ({type(exc).__name__}). Check API configuration.", inline_keypad=back_keypad())
@@ -290,12 +290,12 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
             await client.send_message(chat_id, WELCOME, inline_keypad=main_keypad())
             return
         if button_id == "menu:help":
-            await client.send_message(chat_id, WELCOME + "\\n\\nYou can still use /github, /modrinth, /curseforge, /youtube and /download.", inline_keypad=main_keypad())
+            await client.send_message(chat_id, WELCOME + "\n\nYou can still use /github, /modrinth, /curseforge, /youtube and /download.", inline_keypad=main_keypad())
             return
         if button_id == "menu:downloads":
             await client.send_message(
                 chat_id,
-                "⬇️ Downloads\\nChoose an item from a GitHub, Modrinth, or CurseForge search result to get a download button. You can also use /download with a provider and project identifier.",
+                "⬇️ Downloads\nChoose an item from a GitHub, Modrinth, or CurseForge search result to get a download button. You can also use /download with a provider and project identifier.",
                 inline_keypad=main_keypad(),
             )
             return
@@ -303,7 +303,7 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
             provider = button_id.split(":", 1)[1]
             if provider in {"github", "modrinth", "curseforge", "youtube"}:
                 _PENDING_SEARCH[chat_id] = provider
-                await client.send_message(chat_id, f"🔎 {provider.title()} search\\nNow send the words you want to search for.", inline_keypad=back_keypad())
+                await client.send_message(chat_id, f"🔎 {provider.title()} search\nNow send the words you want to search for.", inline_keypad=back_keypad())
                 return
         if button_id.startswith("release:"):
             await _show_release(client, chat_id, button_id.split(":", 1)[1])
@@ -351,8 +351,8 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
             return
         try:
             found = await curseforge.list_files(int(parts[1]), game_version=parts[2] if len(parts) == 3 else None, limit=8)
-            lines = [f"🟠 {item['display_name'] or item['file_name']}\\nID: {item['id']} · {((item.get('file_length') or 0) / 1048576):.1f} MB" for item in found]
-            await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No CurseForge files found.")[:3900], inline_keypad=back_keypad())
+            lines = [f"🟠 {item['display_name'] or item['file_name']}\nID: {item['id']} · {((item.get('file_length') or 0) / 1048576):.1f} MB" for item in found]
+            await client.send_message(chat_id, ("\n\n".join(lines) if lines else "No CurseForge files found.")[:3900], inline_keypad=back_keypad())
         except Exception as exc:
             logger.exception("CurseForge file lookup failed")
             await client.send_message(chat_id, f"⚠️ File lookup failed ({type(exc).__name__}). Check the CurseForge API key.")
