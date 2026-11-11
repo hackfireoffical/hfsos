@@ -1,7 +1,10 @@
 """Message routing for HackFire Gateway."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import os
+import time
 
 from app.downloads import download_asset, split_for_rubika
 from app.providers import curseforge, github, modrinth, youtube
@@ -36,6 +39,11 @@ def _extract_message(update: dict):
     return chat_id, text
 
 
+_DOWNLOAD_SEMAPHORE = asyncio.Semaphore(max(1, int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "2"))))
+_DOWNLOAD_LAST_USED: dict[str, float] = {}
+DOWNLOAD_COOLDOWN_SECONDS = max(0, int(os.getenv("DOWNLOAD_COOLDOWN_SECONDS", "15")))
+
+
 def _sha256(path):
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -44,7 +52,7 @@ def _sha256(path):
     return digest.hexdigest()
 
 
-async def _download_command(client: RubikaClient, chat_id: str, parts: list[str]) -> None:
+async def _download_command_inner(client: RubikaClient, chat_id: str, parts: list[str]) -> None:
     if len(parts) < 3:
         await client.send_message(
             chat_id,
@@ -57,14 +65,18 @@ async def _download_command(client: RubikaClient, chat_id: str, parts: list[str]
     parts_to_send = []
     try:
         url = filename = expected_sha512 = None
-        if source == "github" and len(parts) == 3 and "/" in parts[2]:
+        if source == "github" and len(parts) in (3, 4) and "/" in parts[2]:
             owner, repository = parts[2].split("/", 1)
             release = await github.latest_release(owner, repository)
             assets = (release or {}).get("assets") or []
             if not assets:
                 await client.send_message(chat_id, "No downloadable asset exists in the latest release.")
                 return
-            asset = assets[0]
+            asset_number = int(parts[3]) if len(parts) == 4 else 1
+            if asset_number < 1 or asset_number > len(assets):
+                await client.send_message(chat_id, f"Choose an asset number from 1 to {len(assets)}.")
+                return
+            asset = assets[asset_number - 1]
             url, filename = asset.get("download_url"), asset.get("name")
         elif source == "modrinth" and len(parts) == 3:
             versions = await modrinth.project_versions(parts[2], limit=1)
@@ -121,6 +133,19 @@ async def _download_command(client: RubikaClient, chat_id: str, parts: list[str]
             path.unlink(missing_ok=True)
 
 
+
+async def _download_command(client: RubikaClient, chat_id: str, parts: list[str]) -> None:
+    now = time.monotonic()
+    previous = _DOWNLOAD_LAST_USED.get(chat_id, 0.0)
+    wait = DOWNLOAD_COOLDOWN_SECONDS - (now - previous)
+    if wait > 0:
+        await client.send_message(chat_id, f"Please wait {int(wait) + 1}s before starting another download.")
+        return
+    _DOWNLOAD_LAST_USED[chat_id] = now
+    async with _DOWNLOAD_SEMAPHORE:
+        await _download_command_inner(client, chat_id, parts)
+
+
 async def handle_update(client: RubikaClient, update: dict) -> None:
     extracted = _extract_message(update)
     if not extracted:
@@ -155,6 +180,23 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
             await client.send_message(chat_id, "\\n\\n".join(lines)[:3900])
         except Exception as exc:
             await client.send_message(chat_id, f"⚠️ Release lookup failed ({type(exc).__name__}).")
+        return
+
+
+    if lowered.startswith("/files"):
+        parts = text.split()
+        if len(parts) not in (2, 3):
+            await client.send_message(chat_id, "Usage: /files <CurseForge-project-id> [Minecraft-version]")
+            return
+        try:
+            found = await curseforge.list_files(int(parts[1]), game_version=parts[2] if len(parts) == 3 else None, limit=10)
+            lines = [
+                f"🟠 {item['display_name'] or item['file_name']}\\nID: {item['id']} · {((item.get('file_length') or 0) / 1048576):.1f} MB"
+                for item in found
+            ]
+            await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No CurseForge files found.")[:3900])
+        except Exception as exc:
+            await client.send_message(chat_id, f"⚠️ File lookup failed ({type(exc).__name__}). Check the CurseForge API key.")
         return
 
     if lowered.startswith("/versions"):
