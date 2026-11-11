@@ -4,41 +4,60 @@ A Rubika-based search and delivery bot for selected content platforms.
 
 ## Supported integrations
 
-- GitHub: repository search and release/asset metadata.
-- Modrinth: project search, version lookup, and permitted project-file downloads.
-- CurseForge: planned; requires compliant API access and credentials.
-- YouTube: search and metadata through a primary provider with Invidious and Piped fallbacks. Media delivery is limited to content the user owns or is authorized to download.
+- **YouTube** — search metadata using the official Data API when configured, then public Invidious instances, then Piped instances.
+- **GitHub** — repository search and latest release/asset metadata.
+- **Modrinth** — project search and version/file metadata.
+- **CurseForge** — Minecraft project search and file metadata; requires an approved API key.
 
-## Planned capabilities
+## Current functionality
 
-- Persian and English Rubika interface.
-- Search menus and paginated results.
-- Asynchronous download queue with bounded concurrency.
-- Retry and provider health tracking.
-- Temporary file storage and automatic cleanup.
-- Rubika delivery where supported by the platform's upload limits.
-- Large-file splitting only if Rubika's terms and upload behavior permit it.
-- SHA-256 integrity checks.
-- SQLite persistence for users, jobs, and history.
-- Environment-based secrets; never commit bot tokens.
+- FastAPI service with health endpoint and interactive API docs.
+- Rubika Bot API v3 client using long polling.
+- Rubika commands: `/github`, `/release`, `/modrinth`, `/versions`, `/curseforge`, `/youtube`, `/help`.
+- YouTube provider fallback order: YouTube Data API (if configured), healthy Invidious instances, then Piped instances.
+- Secrets are read from environment variables; real credentials must never be committed.
 
-## Architecture
+## Run locally or on the VPS
 
-Rubika Bot -> Application / Handlers -> Platform providers -> Job queue -> Temporary storage -> Rubika delivery.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env locally and set RUBIKA_BOT_TOKEN.
+python -m app.bot
+```
 
-The YouTube provider manager will try the configured primary provider, then healthy Invidious instances, then Piped instances.
+Start the HTTP API separately:
 
-## Development status
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-This repository is the project source of truth. Integrations and delivery behavior will be implemented and tested incrementally. Public third-party instances are best-effort and are not guaranteed to be online.
+OpenAPI docs are available at `/docs` while the API is running.
+
+## Environment variables
+
+- `RUBIKA_BOT_TOKEN` — required to run the Rubika bot.
+- `GITHUB_TOKEN` — optional; improves GitHub API rate limits.
+- `YOUTUBE_API_KEY` — optional; primary YouTube search provider.
+- `CURSEFORGE_API_KEY` — optional; required for CurseForge integration.
+- `MAX_CONCURRENT_DOWNLOADS` — reserved for the download worker milestone.
+
+## Planned next
+
+- Search result pagination and richer Rubika keyboards.
+- Download queue with host allowlists, bounded concurrency, cancellation, and cleanup.
+- Authorized GitHub/Modrinth/CurseForge file retrieval.
+- Rubika file upload, verified split delivery for files beyond confirmed platform limits.
+- SQLite job history, user permissions, and admin controls.
+
+## Safety and reliability
+
+Public Invidious and Piped instances are third-party services and can disappear or rate-limit requests. The bot rotates through discovered instances but cannot guarantee availability. Media retrieval will be limited to content the user owns or is authorized to download. Large-file splitting and upload behavior will be implemented only after Rubika's current API limits and terms are verified.
 
 ## Security
 
-- Put credentials in environment variables or a local .env file.
-- .env is ignored by Git.
-- Never commit bot tokens, API keys, or private credentials.
-- Restrict bot access and download concurrency before public deployment.
-
-## License
-
-To be selected by the repository owner.
+- Keep the real `.env` file out of Git.
+- Never paste bot tokens or API keys into issues, commits, screenshots, or chat.
+- Do not expose the API publicly without authentication and rate limiting.
