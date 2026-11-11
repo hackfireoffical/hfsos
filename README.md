@@ -21,7 +21,7 @@ A Rubika-based search and delivery bot for selected content platforms.
 
 ## Install on Ubuntu VPS
 
-Recommended: Ubuntu 24.04 LTS with systemd and root/sudo access.
+Recommended: Ubuntu 24.04 LTS with root/sudo access. systemd is preferred; restricted VPS containers without systemd are supported through Supervisor.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hackfireoffical/hfsos/main/install.sh -o install.sh
@@ -29,15 +29,16 @@ sudo bash install.sh
 rm -f install.sh
 ```
 
-The installer clones the project to `/opt/hackfire-gateway`, creates a restricted system user and Python virtual environment, prompts privately for your Rubika token, and installs/enables the bot and localhost-only API systemd services.
+The installer clones the project to `/opt/hackfire-gateway`, creates a restricted system user and Python virtual environment, prompts privately for your Rubika token, and starts the bot and localhost-only API using systemd or Supervisor, depending on the VPS environment.
 
 Full instructions: [docs/VPS_INSTALL.md](docs/VPS_INSTALL.md).
 
 ## Service management
 
 ```bash
-sudo systemctl status hackfire-gateway-bot
-sudo journalctl -u hackfire-gateway-bot -f
+sudo bash /opt/hackfire-gateway/scripts/status.sh
+# On systemd: sudo journalctl -u hackfire-gateway-bot -f
+# Without systemd: sudo tail -f /var/log/hackfire-gateway-bot.log
 curl http://127.0.0.1:8000/health
 sudo bash /opt/hackfire-gateway/scripts/update.sh
 ```
