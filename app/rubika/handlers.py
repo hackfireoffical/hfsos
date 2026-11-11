@@ -1,22 +1,26 @@
-"""Message routing for the first HackFire Gateway Rubika bot milestone."""
+"""Message routing for HackFire Gateway."""
 from __future__ import annotations
 
-from app.providers import curseforge, github, modrinth, youtube
-from app.downloads import download_asset, split_for_rubika
 import hashlib
+
+from app.downloads import download_asset, split_for_rubika
+from app.providers import curseforge, github, modrinth, youtube
 from app.rubika.client import RubikaClient
 
 
 WELCOME = (
-    "🔥 HackFire Gateway\n\n"
-    "Search supported platforms through Rubika.\n\n"
-    "Commands:\n"
-    "/github <query> — search repositories\n"
-    "/release <owner/repo> — latest GitHub release\n"
-    "/modrinth <query> — search mods and modpacks\n"
-    "/versions <project-slug> — list Modrinth versions\n"
-    "/curseforge <query> — search CurseForge (API key required)\n"
-    "/youtube <query> — search YouTube metadata\n"
+    "🔥 HackFire Gateway\\n\\n"
+    "Search and retrieve supported files through Rubika.\\n\\n"
+    "Commands:\\n"
+    "/github <query> — search repositories\\n"
+    "/release <owner/repo> — latest GitHub release\\n"
+    "/modrinth <query> — search mods and modpacks\\n"
+    "/versions <project-slug> — list Modrinth versions\\n"
+    "/curseforge <query> — search CurseForge (API key required)\\n"
+    "/youtube <query> — search YouTube metadata\\n"
+    "/download github owner/repo — download first latest-release asset\\n"
+    "/download modrinth project-slug — download latest primary file\\n"
+    "/download curseforge project-id file-id — download a CurseForge file\\n"
     "/help — show this message"
 )
 
@@ -32,6 +36,91 @@ def _extract_message(update: dict):
     return chat_id, text
 
 
+def _sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+async def _download_command(client: RubikaClient, chat_id: str, parts: list[str]) -> None:
+    if len(parts) < 3:
+        await client.send_message(
+            chat_id,
+            "Usage:\\n/download github owner/repo\\n/download modrinth project-slug\\n/download curseforge project-id file-id",
+        )
+        return
+
+    source = parts[1].lower()
+    path = None
+    parts_to_send = []
+    try:
+        url = filename = expected_sha512 = None
+        if source == "github" and len(parts) == 3 and "/" in parts[2]:
+            owner, repository = parts[2].split("/", 1)
+            release = await github.latest_release(owner, repository)
+            assets = (release or {}).get("assets") or []
+            if not assets:
+                await client.send_message(chat_id, "No downloadable asset exists in the latest release.")
+                return
+            asset = assets[0]
+            url, filename = asset.get("download_url"), asset.get("name")
+        elif source == "modrinth" and len(parts) == 3:
+            versions = await modrinth.project_versions(parts[2], limit=1)
+            files = (versions[0].get("files") or []) if versions else []
+            chosen = next((item for item in files if item.get("primary")), files[0] if files else None)
+            if not chosen:
+                await client.send_message(chat_id, "No downloadable file found for that Modrinth project.")
+                return
+            url, filename, expected_sha512 = chosen.get("url"), chosen.get("filename"), chosen.get("sha512")
+        elif source == "curseforge" and len(parts) == 4:
+            files = await curseforge.list_files(int(parts[2]), limit=50)
+            chosen = next((item for item in files if str(item.get("id")) == parts[3]), None)
+            if not chosen or not chosen.get("download_url"):
+                await client.send_message(chat_id, "That CurseForge file is unavailable for direct download.")
+                return
+            url, filename = chosen.get("download_url"), chosen.get("file_name")
+        else:
+            await client.send_message(chat_id, "Invalid download command. Send /help for examples.")
+            return
+
+        if not url or not filename:
+            await client.send_message(chat_id, "The provider did not return a downloadable file.")
+            return
+
+        await client.send_message(chat_id, f"⬇️ Downloading {filename}…")
+        path = await download_asset(url, filename, expected_sha512)
+        parts_to_send = split_for_rubika(path)
+        digest = _sha256(path)
+        if len(parts_to_send) > 1:
+            await client.send_message(
+                chat_id,
+                f"📦 {path.name} exceeds Rubika's 50 MB limit. Sending {len(parts_to_send)} numbered parts.\\n"
+                f"Join the parts in order to restore the original file.\\nSHA-256: {digest}",
+            )
+
+        for index, part in enumerate(parts_to_send, 1):
+            caption = f"{path.name} · part {index}/{len(parts_to_send)}" if len(parts_to_send) > 1 else path.name
+            await client.send_file(chat_id, part, caption)
+
+        await client.send_message(
+            chat_id,
+            f"✅ Delivery complete: {path.name} ({path.stat().st_size / 1048576:.1f} MB).",
+        )
+    except Exception as exc:
+        await client.send_message(
+            chat_id,
+            f"⚠️ Download failed ({type(exc).__name__}). Check provider availability/API key and try again.",
+        )
+    finally:
+        for part in parts_to_send:
+            if path is not None and part != path:
+                part.unlink(missing_ok=True)
+        if path is not None:
+            path.unlink(missing_ok=True)
+
+
 async def handle_update(client: RubikaClient, update: dict) -> None:
     extracted = _extract_message(update)
     if not extracted:
@@ -43,69 +132,8 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
         await client.send_message(chat_id, WELCOME)
         return
 
-
     if lowered.startswith("/download"):
-        parts = text.split()
-        if len(parts) < 3:
-            await client.send_message(
-                chat_id,
-                "Usage:\\n/download github owner/repo\\n/download modrinth project-slug\\n/download curseforge project-id file-id",
-            )
-            return
-        source = parts[1].lower()
-        try:
-            url = None
-            filename = None
-            expected_sha512 = None
-            if source == "github" and len(parts) == 3 and "/" in parts[2]:
-                owner, repository = parts[2].split("/", 1)
-                release = await github.latest_release(owner, repository)
-                assets = (release or {}).get("assets") or []
-                if not assets:
-                    await client.send_message(chat_id, "No downloadable asset exists in the latest release.")
-                    return
-                asset = assets[0]
-                url, filename = asset.get("download_url"), asset.get("name")
-            elif source == "modrinth" and len(parts) == 3:
-                versions = await modrinth.project_versions(parts[2], limit=1)
-                files = (versions[0].get("files") or []) if versions else []
-                chosen = next((item for item in files if item.get("primary")), files[0] if files else None)
-                if not chosen:
-                    await client.send_message(chat_id, "No downloadable file found for that Modrinth project.")
-                    return
-                url, filename, expected_sha512 = chosen.get("url"), chosen.get("filename"), chosen.get("sha512")
-            elif source == "curseforge" and len(parts) == 4:
-                files = await curseforge.list_files(int(parts[2]), limit=50)
-                chosen = next((item for item in files if str(item.get("id")) == parts[3]), None)
-                if not chosen or not chosen.get("download_url"):
-                    await client.send_message(chat_id, "That CurseForge file is unavailable for direct download.")
-                    return
-                url, filename = chosen.get("download_url"), chosen.get("file_name")
-            else:
-                await client.send_message(chat_id, "Invalid download command. Send /help for examples.")
-                return
-            if not url or not filename:
-                await client.send_message(chat_id, "The provider did not return a downloadable file.")
-                return
-            await client.send_message(chat_id, f"⬇️ Downloading {filename}…")
-            path = await download_asset(url, filename, expected_sha512)
-            parts_to_send = split_for_rubika(path)
-            sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
-            if len(parts_to_send) > 1:
-                await client.send_message(
-                    chat_id,
-                    f"📦 {path.name} is larger than Rubika's 50 MB file limit. Sending {len(parts_to_send)} numbered parts.\\nSHA-256: {sha256}",
-                )
-            for index, part in enumerate(parts_to_send, 1):
-                caption = f"{path.name} · part {index}/{len(parts_to_send)}" if len(parts_to_send) > 1 else path.name
-                await client.send_file(chat_id, part, caption)
-            await client.send_message(chat_id, f"✅ Delivery complete: {path.name} ({path.stat().st_size / 1048576:.1f} MB).")
-            for part in parts_to_send:
-                if part != path:
-                    part.unlink(missing_ok=True)
-            path.unlink(missing_ok=True)
-        except Exception as exc:
-            await client.send_message(chat_id, f"⚠️ Download failed ({type(exc).__name__}). Check the provider/API key and try again.")
+        await _download_command(client, chat_id, text.split())
         return
 
     if lowered.startswith("/release"):
@@ -122,9 +150,9 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
             lines = [f"🐙 {owner}/{repository} — {release.get('name') or release.get('tag')}"]
             for asset in release.get("assets", [])[:8]:
                 size_mb = (asset.get("size") or 0) / (1024 * 1024)
-                lines.append(f"📦 {asset['name']} · {size_mb:.1f} MB\n{asset['download_url']}")
+                lines.append(f"📦 {asset['name']} · {size_mb:.1f} MB\\n{asset['download_url']}")
             lines.append(release.get("url") or "")
-            await client.send_message(chat_id, "\n\n".join(lines)[:3900])
+            await client.send_message(chat_id, "\\n\\n".join(lines)[:3900])
         except Exception as exc:
             await client.send_message(chat_id, f"⚠️ Release lookup failed ({type(exc).__name__}).")
         return
@@ -137,12 +165,12 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
         try:
             versions = await modrinth.project_versions(parts[1], limit=8)
             lines = [
-                f"🟢 {item['version_number']} — {', '.join(item['loaders']) or 'Any loader'}\n"
-                f"MC: {', '.join(item['game_versions'][:5])}\n"
+                f"🟢 {item['version_number']} — {', '.join(item['loaders']) or 'Any loader'}\\n"
+                f"MC: {', '.join(item['game_versions'][:5])}\\n"
                 f"{next((file['url'] for file in item['files'] if file['primary']), item['files'][0]['url'] if item['files'] else '')}"
                 for item in versions
             ]
-            await client.send_message(chat_id, ("\n\n".join(lines) if lines else "No versions found.")[:3900])
+            await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No versions found.")[:3900])
         except Exception as exc:
             await client.send_message(chat_id, f"⚠️ Version lookup failed ({type(exc).__name__}).")
         return
@@ -163,29 +191,29 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
                 if provider_name == "github":
                     results = await github.search_repositories(query, 5)
                     lines = [
-                        f"🐙 {item['full_name']}\n⭐ {item['stars']} · {item.get('language') or 'Unknown'}\n{item['url']}"
+                        f"🐙 {item['full_name']}\\n⭐ {item['stars']} · {item.get('language') or 'Unknown'}\\n{item['url']}"
                         for item in results
                     ]
                 elif provider_name == "modrinth":
                     results = await modrinth.search_projects(query, limit=5)
                     lines = [
-                        f"🟢 {item['title']} ({item['project_type']})\n⬇️ {item['downloads']:,}\n{item['url']}"
+                        f"🟢 {item['title']} ({item['project_type']})\\n⬇️ {item['downloads']:,}\\n{item['url']}"
                         for item in results
                     ]
                 elif provider_name == "curseforge":
                     results = await curseforge.search_projects(query, limit=5)
                     lines = [
-                        f"🟠 {item['name']}\n⬇️ {item['downloads']:,}\n{item.get('website_url') or item['slug']}"
+                        f"🟠 {item['name']}\\n⬇️ {item['downloads']:,}\\n{item.get('website_url') or item['slug']}"
                         for item in results
                     ]
                 else:
                     payload = await youtube.search_videos(query, 5)
                     results = payload["results"]
                     lines = [
-                        f"▶️ {item.get('title') or 'Untitled'}\n{item.get('channel') or 'Unknown channel'}\n{item.get('url') or ''}"
+                        f"▶️ {item.get('title') or 'Untitled'}\\n{item.get('channel') or 'Unknown channel'}\\n{item.get('url') or ''}"
                         for item in results
                     ]
-                await client.send_message(chat_id, ("\n\n".join(lines) if lines else "No results found.")[:3900])
+                await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No results found.")[:3900])
             except Exception as exc:
                 await client.send_message(chat_id, f"⚠️ Search failed ({type(exc).__name__}). Check provider configuration and try again.")
             return
