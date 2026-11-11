@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -54,8 +53,6 @@ class RubikaClient:
 
     async def send_file(self, chat_id: str, path: Path, text: str | None = None) -> dict[str, Any]:
         """Upload one Rubika-safe file and send it to a chat using Bot API v3."""
-        import os
-
         if path.stat().st_size > 50 * 1024 * 1024:
             raise ValueError("Rubika general-file uploads are limited to 50 MB.")
         requested = await self.call("requestSendFile", {"type": "File"})
