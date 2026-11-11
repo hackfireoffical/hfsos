@@ -1,6 +1,6 @@
 import unittest
 
-from app.rubika.handlers import WELCOME, _extract_message
+from app.rubika.handlers import WELCOME, _button_id, _extract_message, main_keypad
 
 
 class HandlerTests(unittest.TestCase):
@@ -20,9 +20,31 @@ class HandlerTests(unittest.TestCase):
             "type": "NewMessage", "chat_id": "x", "new_message": {"text": "  "}
         }))
 
-    def test_help_includes_download_and_file_lookup(self):
-        self.assertIn("/download github", WELCOME)
-        self.assertIn("/files <project-id>", WELCOME)
+    def test_help_mentions_interactive_menu(self):
+        self.assertIn("Choose a service", WELCOME)
+
+    def test_main_menu_has_all_four_search_providers(self):
+        keyboard = main_keypad()
+        button_ids = [
+            button["id"]
+            for row in keyboard["rows"]
+            for button in row["buttons"]
+        ]
+        self.assertEqual(
+            set(button_ids),
+            {"menu:github", "menu:modrinth", "menu:curseforge", "menu:youtube", "menu:downloads", "menu:help"},
+        )
+
+    def test_extracts_inline_button_callback(self):
+        update = {
+            "type": "NewMessage",
+            "chat_id": "chat-guid",
+            "new_message": {
+                "text": "GitHub",
+                "aux_data": {"button_id": "menu:github"},
+            },
+        }
+        self.assertEqual(_button_id(update), "menu:github")
 
 
 if __name__ == "__main__":
