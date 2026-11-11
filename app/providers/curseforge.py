@@ -77,3 +77,26 @@ async def list_files(mod_id: int, game_version: str | None = None, limit: int = 
         }
         for item in payload.get("data", [])
     ]
+
+
+async def get_file(mod_id: int, file_id: int) -> dict[str, Any] | None:
+    """Fetch one exact CurseForge file by project and file ID."""
+    if mod_id <= 0 or file_id <= 0:
+        raise ValueError("Invalid CurseForge project or file ID.")
+    async with httpx.AsyncClient(timeout=TIMEOUT, headers=_headers()) as client:
+        response = await client.get(f"{API}/mods/{mod_id}/files/{file_id}")
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        item = response.json().get("data") or {}
+    if not item:
+        return None
+    return {
+        "id": item.get("id"),
+        "display_name": item.get("displayName"),
+        "file_name": item.get("fileName"),
+        "file_length": item.get("fileLength"),
+        "release_type": item.get("releaseType"),
+        "game_versions": item.get("gameVersions", []),
+        "download_url": item.get("downloadUrl"),
+    }
