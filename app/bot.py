@@ -13,23 +13,35 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger("hackfire.bot")
+MAX_ACTIVE_HANDLERS = max(2, int(os.getenv("MAX_ACTIVE_HANDLERS", "8")))
 
 
 async def run() -> None:
     client = RubikaClient()
     offset_id: str | None = None
+    handler_slots = asyncio.Semaphore(MAX_ACTIVE_HANDLERS)
+    pending: set[asyncio.Task] = set()
+
+    async def dispatch(update: dict) -> None:
+        async with handler_slots:
+            try:
+                await handle_update(client, update)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Failed to process a Rubika update.")
+
     try:
-        bot_info = await client.get_me()
+        await client.get_me()
         logger.info("Connected to Rubika Bot API.")
         while True:
             try:
                 page = await client.get_updates(offset_id=offset_id, limit=20)
                 updates = page.get("updates") or []
                 for update in updates:
-                    try:
-                        await handle_update(client, update)
-                    except Exception:
-                        logger.exception("Failed to process a Rubika update.")
+                    task = asyncio.create_task(dispatch(update))
+                    pending.add(task)
+                    task.add_done_callback(pending.discard)
                 offset_id = page.get("next_offset_id") or offset_id
                 if not updates:
                     await asyncio.sleep(2)
@@ -39,6 +51,8 @@ async def run() -> None:
                 logger.warning("Rubika polling error: %s", type(exc).__name__)
                 await asyncio.sleep(5)
     finally:
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
         await client.close()
 
 
