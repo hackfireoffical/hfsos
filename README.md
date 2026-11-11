@@ -12,7 +12,8 @@ A Rubika-based search and delivery bot for selected content platforms.
 ## Current functionality
 
 - FastAPI service with health endpoint and interactive API docs.
-- Rubika Bot API v3 client using long polling.
+- Rubika Bot API v3 client using long polling, with inline-button menus for GitHub, Modrinth, CurseForge, YouTube, and downloads.
+- Search flows are menu-driven: tap a provider, type a query, then use result buttons for releases, versions, file lists, and supported downloads.
 - Rubika commands: `/github`, `/release`, `/modrinth`, `/versions`, `/curseforge`, `/files`, `/youtube`, `/download`, `/help`.
 - Authorized GitHub release, Modrinth version, and CurseForge file downloads with bounded streaming and provider hash verification where available.
 - Rubika file upload using the official two-step `requestSendFile` → multipart upload → `sendFile` flow; files over the documented 50 MB limit are split into 45 MiB parts.
