@@ -177,9 +177,9 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
                 await client.send_message(chat_id, "No published release found.")
                 return
             lines = [f"🐙 {owner}/{repository} — {release.get('name') or release.get('tag')}"]
-            for asset in release.get("assets", [])[:8]:
+            for index, asset in enumerate(release.get("assets", [])[:8], 1):
                 size_mb = (asset.get("size") or 0) / (1024 * 1024)
-                lines.append(f"📦 {asset['name']} · {size_mb:.1f} MB\n{asset['download_url']}")
+                lines.append(f"📦 {index}. {asset['name']} · {size_mb:.1f} MB\n{asset['download_url']}")
             lines.append(release.get("url") or "")
             await client.send_message(chat_id, "\n\n".join(lines)[:3900])
         except Exception as exc:
@@ -243,13 +243,13 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
                 elif provider_name == "modrinth":
                     results = await modrinth.search_projects(query, limit=5)
                     lines = [
-                        f"🟢 {item['title']} ({item['project_type']})\n⬇️ {item['downloads']:,}\n{item['url']}"
+                        f"🟢 {item['title']} ({item['project_type']})\nSlug: {item['slug']} · ⬇️ {item['downloads']:,}\n{item['url']}"
                         for item in results
                     ]
                 elif provider_name == "curseforge":
                     results = await curseforge.search_projects(query, limit=5)
                     lines = [
-                        f"🟠 {item['name']}\n⬇️ {item['downloads']:,}\n{item.get('website_url') or item['slug']}"
+                        f"🟠 {item['name']}\nID: {item['id']} · ⬇️ {item['downloads']:,}\n{item.get('website_url') or item['slug']}"
                         for item in results
                     ]
                 else:
