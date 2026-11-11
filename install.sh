@@ -40,24 +40,26 @@ mkdir -p data/downloads
 
 if [[ ! -f .env ]]; then
   install -m 600 /dev/null .env
-  log "Configure the Rubika bot token (input is hidden)."
-  read -r -s -p "Rubika bot token: " RUBIKA_TOKEN
-  printf '\n'
-  [[ -n "$RUBIKA_TOKEN" ]] || fail "A Rubika token is required."
   {
-    printf 'APP_NAME=HackFire Gateway\n'
+    printf 'APP_NAME="HackFire Gateway"\n'
     printf 'APP_ENV=production\n'
     printf 'LOG_LEVEL=INFO\n'
-    printf 'RUBIKA_BOT_TOKEN=%s\n' "$RUBIKA_TOKEN"
     printf 'GITHUB_TOKEN=\nYOUTUBE_API_KEY=\nCURSEFORGE_API_KEY=\n'
     printf 'DOWNLOAD_DIR=%s/data/downloads\n' "$APP_DIR"
     printf 'MAX_CONCURRENT_DOWNLOADS=2\nMAX_DOWNLOAD_SIZE_MB=512\n'
   } > .env
-  unset RUBIKA_TOKEN
-  chmod 600 .env
-else
-  log "Existing .env found; leaving credentials unchanged."
 fi
+
+if ! grep -Eq '^RUBIKA_BOT_TOKEN=.+$' .env; then
+  log "Configure the Rubika bot token (input is hidden)."
+  read -r -s -p "Rubika bot token: " RUBIKA_TOKEN
+  printf '\n'
+  [[ -n "$RUBIKA_TOKEN" ]] || fail "A Rubika token is required."
+  sed -i '/^RUBIKA_BOT_TOKEN=/d' .env
+  printf 'RUBIKA_BOT_TOKEN=%s\n' "$RUBIKA_TOKEN" >> .env
+  unset RUBIKA_TOKEN
+fi
+chmod 600 .env
 
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
 chmod 600 .env
