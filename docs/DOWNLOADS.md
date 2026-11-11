@@ -1,6 +1,6 @@
 # Downloads and Rubika delivery
 
-HackFire Gateway downloads files only from URLs returned by supported provider APIs and only over HTTPS from an explicit host allowlist. The downloader streams to disk, enforces `MAX_DOWNLOAD_SIZE_MB`, and verifies Modrinth SHA-512 values when provided.
+HackFire Gateway downloads files only from URLs returned by supported provider APIs and only over HTTPS from an explicit host allowlist. The downloader streams to a unique per-job directory, enforces `MAX_DOWNLOAD_SIZE_MB`, verifies Modrinth SHA-512 values when provided, and removes temporary files after delivery. Download requests are limited per chat and globally bounded.
 
 ## Rubika file delivery
 
@@ -10,9 +10,10 @@ Files larger than the Rubika cap are split into numbered `.partNNN` attachments.
 
 ## Commands
 
-- `/download github owner/repository` — downloads the first asset of the latest published release.
+- `/download github owner/repository [asset-number]` — downloads a numbered asset from the latest published release. `/release owner/repository` lists the available assets.
 - `/download modrinth project-slug` — downloads the primary file of the latest published version.
-- `/download curseforge project-id file-id` — downloads a CurseForge file using its official API metadata (requires an approved API key).
+- `/files project-id [minecraft-version]` — lists recent CurseForge file IDs (requires an approved API key).
+- `/download curseforge project-id file-id` — downloads one exact CurseForge file using official API metadata (requires an approved API key).
 
 YouTube search returns metadata and the official watch link only. This project does not bypass DRM, subscriptions, access controls, or platform restrictions. Only download content you own or are authorized to retrieve.
 
