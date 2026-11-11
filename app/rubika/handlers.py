@@ -12,18 +12,19 @@ from app.rubika.client import RubikaClient
 
 
 WELCOME = (
-    "🔥 HackFire Gateway\\n\\n"
-    "Search and retrieve supported files through Rubika.\\n\\n"
-    "Commands:\\n"
-    "/github <query> — search repositories\\n"
-    "/release <owner/repo> — latest GitHub release\\n"
-    "/modrinth <query> — search mods and modpacks\\n"
-    "/versions <project-slug> — list Modrinth versions\\n"
-    "/curseforge <query> — search CurseForge (API key required)\\n"
-    "/youtube <query> — search YouTube metadata\\n"
-    "/download github owner/repo — download first latest-release asset\\n"
-    "/download modrinth project-slug — download latest primary file\\n"
-    "/download curseforge project-id file-id — download a CurseForge file\\n"
+    "🔥 HackFire Gateway\n\n"
+    "Search and retrieve supported files through Rubika.\n\n"
+    "Commands:\n"
+    "/github <query> — search repositories\n"
+    "/release <owner/repo> — latest GitHub release\n"
+    "/modrinth <query> — search mods and modpacks\n"
+    "/versions <project-slug> — list Modrinth versions\n"
+    "/curseforge <query> — search CurseForge (API key required)\n"
+    "/files <project-id> — list CurseForge file IDs\n"
+    "/youtube <query> — search YouTube metadata\n"
+    "/download github owner/repo [asset-number] — download a release asset\n"
+    "/download modrinth project-slug — download latest primary file\n"
+    "/download curseforge project-id file-id — download a CurseForge file\n"
     "/help — show this message"
 )
 
@@ -56,7 +57,7 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
     if len(parts) < 3:
         await client.send_message(
             chat_id,
-            "Usage:\\n/download github owner/repo\\n/download modrinth project-slug\\n/download curseforge project-id file-id",
+            "Usage:\n/download github owner/repo [asset-number]\n/download modrinth project-slug\n/download curseforge project-id file-id",
         )
         return
 
@@ -108,8 +109,8 @@ async def _download_command_inner(client: RubikaClient, chat_id: str, parts: lis
         if len(parts_to_send) > 1:
             await client.send_message(
                 chat_id,
-                f"📦 {path.name} exceeds Rubika's 50 MB limit. Sending {len(parts_to_send)} numbered parts.\\n"
-                f"Join the parts in order to restore the original file.\\nSHA-256: {digest}",
+                f"📦 {path.name} exceeds Rubika's 50 MB limit. Sending {len(parts_to_send)} numbered parts.\n"
+                f"Join the parts in order to restore the original file.\nSHA-256: {digest}",
             )
 
         for index, part in enumerate(parts_to_send, 1):
@@ -175,9 +176,9 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
             lines = [f"🐙 {owner}/{repository} — {release.get('name') or release.get('tag')}"]
             for asset in release.get("assets", [])[:8]:
                 size_mb = (asset.get("size") or 0) / (1024 * 1024)
-                lines.append(f"📦 {asset['name']} · {size_mb:.1f} MB\\n{asset['download_url']}")
+                lines.append(f"📦 {asset['name']} · {size_mb:.1f} MB\n{asset['download_url']}")
             lines.append(release.get("url") or "")
-            await client.send_message(chat_id, "\\n\\n".join(lines)[:3900])
+            await client.send_message(chat_id, "\n\n".join(lines)[:3900])
         except Exception as exc:
             await client.send_message(chat_id, f"⚠️ Release lookup failed ({type(exc).__name__}).")
         return
@@ -191,10 +192,10 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
         try:
             found = await curseforge.list_files(int(parts[1]), game_version=parts[2] if len(parts) == 3 else None, limit=10)
             lines = [
-                f"🟠 {item['display_name'] or item['file_name']}\\nID: {item['id']} · {((item.get('file_length') or 0) / 1048576):.1f} MB"
+                f"🟠 {item['display_name'] or item['file_name']}\nID: {item['id']} · {((item.get('file_length') or 0) / 1048576):.1f} MB"
                 for item in found
             ]
-            await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No CurseForge files found.")[:3900])
+            await client.send_message(chat_id, ("\n\n".join(lines) if lines else "No CurseForge files found.")[:3900])
         except Exception as exc:
             await client.send_message(chat_id, f"⚠️ File lookup failed ({type(exc).__name__}). Check the CurseForge API key.")
         return
@@ -207,12 +208,12 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
         try:
             versions = await modrinth.project_versions(parts[1], limit=8)
             lines = [
-                f"🟢 {item['version_number']} — {', '.join(item['loaders']) or 'Any loader'}\\n"
-                f"MC: {', '.join(item['game_versions'][:5])}\\n"
+                f"🟢 {item['version_number']} — {', '.join(item['loaders']) or 'Any loader'}\n"
+                f"MC: {', '.join(item['game_versions'][:5])}\n"
                 f"{next((file['url'] for file in item['files'] if file['primary']), item['files'][0]['url'] if item['files'] else '')}"
                 for item in versions
             ]
-            await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No versions found.")[:3900])
+            await client.send_message(chat_id, ("\n\n".join(lines) if lines else "No versions found.")[:3900])
         except Exception as exc:
             await client.send_message(chat_id, f"⚠️ Version lookup failed ({type(exc).__name__}).")
         return
@@ -233,29 +234,29 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
                 if provider_name == "github":
                     results = await github.search_repositories(query, 5)
                     lines = [
-                        f"🐙 {item['full_name']}\\n⭐ {item['stars']} · {item.get('language') or 'Unknown'}\\n{item['url']}"
+                        f"🐙 {item['full_name']}\n⭐ {item['stars']} · {item.get('language') or 'Unknown'}\n{item['url']}"
                         for item in results
                     ]
                 elif provider_name == "modrinth":
                     results = await modrinth.search_projects(query, limit=5)
                     lines = [
-                        f"🟢 {item['title']} ({item['project_type']})\\n⬇️ {item['downloads']:,}\\n{item['url']}"
+                        f"🟢 {item['title']} ({item['project_type']})\n⬇️ {item['downloads']:,}\n{item['url']}"
                         for item in results
                     ]
                 elif provider_name == "curseforge":
                     results = await curseforge.search_projects(query, limit=5)
                     lines = [
-                        f"🟠 {item['name']}\\n⬇️ {item['downloads']:,}\\n{item.get('website_url') or item['slug']}"
+                        f"🟠 {item['name']}\n⬇️ {item['downloads']:,}\n{item.get('website_url') or item['slug']}"
                         for item in results
                     ]
                 else:
                     payload = await youtube.search_videos(query, 5)
                     results = payload["results"]
                     lines = [
-                        f"▶️ {item.get('title') or 'Untitled'}\\n{item.get('channel') or 'Unknown channel'}\\n{item.get('url') or ''}"
+                        f"▶️ {item.get('title') or 'Untitled'}\n{item.get('channel') or 'Unknown channel'}\n{item.get('url') or ''}"
                         for item in results
                     ]
-                await client.send_message(chat_id, ("\\n\\n".join(lines) if lines else "No results found.")[:3900])
+                await client.send_message(chat_id, ("\n\n".join(lines) if lines else "No results found.")[:3900])
             except Exception as exc:
                 await client.send_message(chat_id, f"⚠️ Search failed ({type(exc).__name__}). Check provider configuration and try again.")
             return
