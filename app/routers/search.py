@@ -1,7 +1,7 @@
 """Search endpoints for supported platforms."""
 from fastapi import APIRouter, HTTPException, Query
 
-from app.providers import github, modrinth, youtube
+from app.providers import curseforge, github, modrinth, youtube
 
 router = APIRouter(prefix="/api", tags=["search"])
 
@@ -50,6 +50,26 @@ async def modrinth_versions(
         return {"results": await modrinth.project_versions(project_id_or_slug, game_version, loader, limit)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Modrinth provider failed: {type(exc).__name__}") from exc
+
+
+@router.get("/curseforge/search")
+async def curseforge_search(
+    q: str = Query(min_length=1, max_length=200),
+    project_type: str = "mod",
+    limit: int = 10,
+):
+    try:
+        return {"results": await curseforge.search_projects(q, project_type, limit)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"CurseForge provider failed: {type(exc).__name__}") from exc
+
+
+@router.get("/curseforge/{mod_id}/files")
+async def curseforge_files(mod_id: int, game_version: str | None = None, limit: int = 20):
+    try:
+        return {"results": await curseforge.list_files(mod_id, game_version, limit)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"CurseForge provider failed: {type(exc).__name__}") from exc
 
 
 @router.get("/youtube/search")
