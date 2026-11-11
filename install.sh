@@ -132,7 +132,7 @@ else
   mkdir -p /etc/supervisor/conf.d
   cat > /etc/supervisor/conf.d/hackfire-gateway.conf <<UNIT
 [program:hackfire-gateway-bot]
-command=$APP_DIR/.venv/bin/python -m app.bot
+command=/bin/bash -c 'set -a; . $APP_DIR/.env; exec $APP_DIR/.venv/bin/python -m app.bot'
 directory=$APP_DIR
 user=$SERVICE_USER
 environment=HOME="$APP_DIR",PYTHONDONTWRITEBYTECODE="1"
@@ -145,7 +145,7 @@ redirect_stderr=true
 stdout_logfile=/var/log/hackfire-gateway-bot.log
 
 [program:hackfire-gateway-api]
-command=$APP_DIR/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+command=/bin/bash -c 'set -a; . $APP_DIR/.env; exec $APP_DIR/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000'
 directory=$APP_DIR
 user=$SERVICE_USER
 environment=HOME="$APP_DIR",HOST="127.0.0.1",PORT="8000",PYTHONDONTWRITEBYTECODE="1"
