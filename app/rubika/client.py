@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -50,3 +51,31 @@ class RubikaClient:
         if inline_keypad:
             payload["inline_keypad"] = inline_keypad
         return await self.call("sendMessage", payload)
+
+    async def send_file(self, chat_id: str, path: Path, text: str | None = None) -> dict[str, Any]:
+        """Upload one Rubika-safe file and send it to a chat using Bot API v3."""
+        import os
+
+        if path.stat().st_size > 50 * 1024 * 1024:
+            raise ValueError("Rubika general-file uploads are limited to 50 MB.")
+        requested = await self.call("requestSendFile", {"type": "File"})
+        upload_url = requested.get("upload_url")
+        if not isinstance(upload_url, str) or not upload_url.startswith("https://"):
+            raise RubikaAPIError("Rubika returned an invalid upload URL.")
+        with path.open("rb") as handle:
+            response = await self.client.post(
+                upload_url,
+                files={"file": (path.name, handle, "application/octet-stream")},
+                timeout=httpx.Timeout(180.0, connect=15.0),
+            )
+        response.raise_for_status()
+        uploaded = response.json()
+        if uploaded.get("status") != "OK":
+            raise RubikaAPIError("Rubika file upload failed.")
+        file_id = (uploaded.get("data") or {}).get("file_id")
+        if not file_id:
+            raise RubikaAPIError("Rubika upload response did not contain a file ID.")
+        payload: dict[str, Any] = {"chat_id": chat_id, "file_id": file_id}
+        if text:
+            payload["text"] = text[:1000]
+        return await self.call("sendFile", payload)
