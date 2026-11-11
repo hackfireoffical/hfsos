@@ -63,5 +63,6 @@ sudo systemctl restart hackfire-gateway-api
 
 - Keep port 8000 bound to 127.0.0.1. The API does not yet have user authentication.
 - Never publish or commit `.env`.
-- The current bot milestone performs search/metadata operations. It is not yet a download-and-delivery bot.
+- Search and download commands are available for GitHub releases, Modrinth versions, and CurseForge files (the latter requires an approved API key).
+- YouTube currently provides search metadata and watch links only; it does not download media.
 - Verify the bot can reach Rubika from the VPS before relying on it during a connectivity disruption.
