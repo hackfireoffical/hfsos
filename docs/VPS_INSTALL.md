@@ -1,6 +1,6 @@
 # Ubuntu VPS installation
 
-The supported installer targets Ubuntu 24.04 (and compatible Ubuntu/Debian releases) with systemd.
+The installer targets Ubuntu 24.04 (and compatible Ubuntu/Debian releases). It uses systemd when available and automatically falls back to Supervisor in containers or VPS environments without systemd.
 
 ## Install
 
@@ -25,16 +25,18 @@ The installer:
 - Creates a Python virtual environment and installs requirements.
 - Prompts for the Rubika token without echoing it.
 - Writes the token to a root-created, restricted root-owned `.env` file (readable only by the service group).
-- Installs and enables separate systemd services for the Rubika bot and localhost-only API.
+- Starts separate managed processes for the Rubika bot and localhost-only API (systemd when available, otherwise Supervisor).
 
 The installer never asks you to paste your token into a command or commit it to Git.
 
 ## Check services
 
 ```bash
-systemctl status hackfire-gateway-bot
-systemctl status hackfire-gateway-api
+sudo bash /opt/hackfire-gateway/scripts/status.sh
+# systemd logs:
 journalctl -u hackfire-gateway-bot -f
+# Supervisor logs (no systemd):
+tail -f /var/log/hackfire-gateway-bot.log
 curl http://127.0.0.1:8000/health
 ```
 
@@ -55,8 +57,7 @@ sudo nano /opt/hackfire-gateway/.env
 Optional values include `GITHUB_TOKEN`, `YOUTUBE_API_KEY`, and `CURSEFORGE_API_KEY`. After changes:
 
 ```bash
-sudo systemctl restart hackfire-gateway-bot
-sudo systemctl restart hackfire-gateway-api
+sudo bash /opt/hackfire-gateway/scripts/update.sh
 ```
 
 ## Security notes
