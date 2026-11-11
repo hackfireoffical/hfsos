@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.routers.search import router as search_router
+
 
 class Settings(BaseSettings):
     app_name: str = "HackFire Gateway"
@@ -9,7 +11,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-app = FastAPI(title=settings.app_name, version="0.1.0")
+app = FastAPI(title=settings.app_name, version="0.2.0")
+app.include_router(search_router)
 
 
 @app.get("/health")
@@ -19,4 +22,4 @@ async def health() -> dict[str, str]:
 
 @app.get("/")
 async def root() -> dict[str, str]:
-    return {"name": settings.app_name, "message": "Gateway API is running"}
+    return {"name": settings.app_name, "message": "Gateway API is running", "docs": "/docs"}
