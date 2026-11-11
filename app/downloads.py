@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import httpx
 
 CHUNK_SIZE = 1024 * 1024
-RUBIKA_FILE_LIMIT = 50 * 1024 * 1024
+RUBIKA_FILE_LIMIT = 50_000_000
 DELIVERY_PART_SIZE = 45 * 1024 * 1024
 ALLOWED_HOSTS = (
     "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
