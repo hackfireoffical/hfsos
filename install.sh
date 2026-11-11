@@ -46,7 +46,7 @@ if [[ ! -f .env ]]; then
     printf 'LOG_LEVEL=INFO\n'
     printf 'GITHUB_TOKEN=\nYOUTUBE_API_KEY=\nCURSEFORGE_API_KEY=\n'
     printf 'DOWNLOAD_DIR=%s/data/downloads\n' "$APP_DIR"
-    printf 'MAX_CONCURRENT_DOWNLOADS=2\nMAX_DOWNLOAD_SIZE_MB=512\n'
+    printf 'MAX_CONCURRENT_DOWNLOADS=2\nMAX_DOWNLOAD_SIZE_MB=512\nDOWNLOAD_COOLDOWN_SECONDS=15\nMAX_ACTIVE_HANDLERS=8\n'
   } > .env
 fi
 
@@ -83,6 +83,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+Environment=PYTHONDONTWRITEBYTECODE=1
 ReadWritePaths=$APP_DIR/data
 
 [Install]
@@ -110,6 +111,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+Environment=PYTHONDONTWRITEBYTECODE=1
 ReadWritePaths=$APP_DIR/data
 
 [Install]
