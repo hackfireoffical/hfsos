@@ -29,6 +29,8 @@ The installer:
 
 The installer never asks you to paste your token into a command or commit it to Git.
 
+After installation, open the bot in Rubika and send `/start`. The bot responds with interactive inline buttons. Choose a provider, send search words, then use the result buttons to inspect releases/versions/files or start supported downloads. Text commands remain available too.
+
 ## Check services
 
 ```bash
