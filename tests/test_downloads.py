@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.downloads import (
-    DELIVERY_PART_SIZE, is_allowed_asset_url, safe_filename, split_for_rubika,
+    DELIVERY_PART_SIZE, RUBIKA_FILE_LIMIT, is_allowed_asset_url, safe_filename, split_for_rubika,
 )
 
 
@@ -22,12 +22,13 @@ class DownloadUtilityTests(unittest.TestCase):
     def test_split_file_into_rubika_safe_parts(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "large.bin"
-            source.write_bytes(b"x" * (DELIVERY_PART_SIZE + 123))
+            source.write_bytes(b"x" * (RUBIKA_FILE_LIMIT + 123))
             parts = split_for_rubika(source)
             self.assertEqual(len(parts), 2)
             self.assertEqual(parts[0].stat().st_size, DELIVERY_PART_SIZE)
-            self.assertEqual(parts[1].stat().st_size, 123)
-            self.assertEqual(b"".join(part.read_bytes() for part in parts), source.read_bytes())
+            self.assertEqual(parts[1].stat().st_size, RUBIKA_FILE_LIMIT + 123 - DELIVERY_PART_SIZE)
+            self.assertTrue(all(part.read_bytes() == b"x" * part.stat().st_size for part in parts))
+            self.assertEqual(sum(part.stat().st_size for part in parts), source.stat().st_size)
 
 
 if __name__ == "__main__":
