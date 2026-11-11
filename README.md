@@ -13,7 +13,9 @@ A Rubika-based search and delivery bot for selected content platforms.
 
 - FastAPI service with health endpoint and interactive API docs.
 - Rubika Bot API v3 client using long polling.
-- Rubika commands: `/github`, `/release`, `/modrinth`, `/versions`, `/curseforge`, `/youtube`, `/help`.
+- Rubika commands: `/github`, `/release`, `/modrinth`, `/versions`, `/curseforge`, `/youtube`, `/download`, `/help`.
+- Authorized GitHub release, Modrinth version, and CurseForge file downloads with bounded streaming and provider hash verification where available.
+- Rubika file upload using the official two-step `requestSendFile` → multipart upload → `sendFile` flow; files over the documented 50 MB limit are split into 45 MiB parts.
 - YouTube provider fallback order: YouTube Data API (if configured), healthy Invidious instances, then Piped instances.
 - Secrets are read from environment variables; real credentials must never be committed.
 
@@ -53,16 +55,16 @@ The API listens only on `127.0.0.1:8000`; do not expose it publicly until authen
 
 - Search result pagination and richer Rubika keyboards.
 - Download queue with host allowlists, bounded concurrency, cancellation, and cleanup.
-- Authorized GitHub/Modrinth/CurseForge file retrieval.
-- Rubika file upload, verified split delivery for files beyond confirmed platform limits.
-- SQLite job history, user permissions, and admin controls.
+- Search pagination, richer Rubika keyboards, and per-user rate limits.
+- Persistent SQLite job history and admin controls.
 
 ## Safety and reliability
 
-Public Invidious and Piped instances are third-party services and can disappear or rate-limit requests. The bot rotates through discovered instances but cannot guarantee availability. Media retrieval will be limited to content the user owns or is authorized to download. Large-file splitting and upload behavior will be implemented only after Rubika's current API limits and terms are verified.
+Public Invidious and Piped instances are third-party services and can disappear or rate-limit requests. The bot rotates through discovered instances but cannot guarantee availability. Media retrieval will be limited to content the user owns or is authorized to download. Large files are split conservatively because the official Rubika API documents a 50 MB general-file cap. The gateway downloads only from provider API asset URLs on an explicit HTTPS host allowlist.
 
 ## Security
 
 - Keep the real `.env` file out of Git.
 - Never paste bot tokens or API keys into issues, commits, screenshots, or chat.
 - Do not expose the API publicly without authentication and rate limiting.
+\n\nDownload behavior and Rubika file-delivery details: [docs/DOWNLOADS.md](docs/DOWNLOADS.md).\n
