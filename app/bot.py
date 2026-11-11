@@ -51,8 +51,10 @@ async def run() -> None:
                 logger.warning("Rubika polling error: %s", type(exc).__name__)
                 await asyncio.sleep(5)
     finally:
+        for task in list(pending):
+            task.cancel()
         if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
+            await asyncio.gather(*list(pending), return_exceptions=True)
         await client.close()
 
 
