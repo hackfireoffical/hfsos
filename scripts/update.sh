@@ -10,7 +10,7 @@ bash -n install.sh scripts/*.sh
 .venv/bin/python -m compileall -q app tests
 .venv/bin/python -m unittest discover -s tests -v
 chown -R hackfire:hackfire "$APP_DIR"
-chown root:root "$APP_DIR/.env"
-chmod 600 "$APP_DIR/.env"
+chown root:hackfire "$APP_DIR/.env"
+chmod 640 "$APP_DIR/.env"
 systemctl restart hackfire-gateway-bot.service hackfire-gateway-api.service
 systemctl --no-pager --full status hackfire-gateway-bot.service hackfire-gateway-api.service
