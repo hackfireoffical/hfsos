@@ -17,24 +17,30 @@ A Rubika-based search and delivery bot for selected content platforms.
 - YouTube provider fallback order: YouTube Data API (if configured), healthy Invidious instances, then Piped instances.
 - Secrets are read from environment variables; real credentials must never be committed.
 
-## Run locally or on the VPS
+## Install on Ubuntu VPS
+
+Recommended: Ubuntu 24.04 LTS with systemd and root/sudo access.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env locally and set RUBIKA_BOT_TOKEN.
-python -m app.bot
+curl -fsSL https://raw.githubusercontent.com/hackfireoffical/hfsos/main/install.sh -o install.sh
+sudo bash install.sh
+rm -f install.sh
 ```
 
-Start the HTTP API separately:
+The installer clones the project to `/opt/hackfire-gateway`, creates a restricted system user and Python virtual environment, prompts privately for your Rubika token, and installs/enables the bot and localhost-only API systemd services.
+
+Full instructions: [docs/VPS_INSTALL.md](docs/VPS_INSTALL.md).
+
+## Service management
 
 ```bash
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+sudo systemctl status hackfire-gateway-bot
+sudo journalctl -u hackfire-gateway-bot -f
+curl http://127.0.0.1:8000/health
+sudo bash /opt/hackfire-gateway/scripts/update.sh
 ```
 
-OpenAPI docs are available at `/docs` while the API is running.
+The API listens only on `127.0.0.1:8000`; do not expose it publicly until authentication and rate limiting are implemented.
 
 ## Environment variables
 
@@ -42,7 +48,6 @@ OpenAPI docs are available at `/docs` while the API is running.
 - `GITHUB_TOKEN` — optional; improves GitHub API rate limits.
 - `YOUTUBE_API_KEY` — optional; primary YouTube search provider.
 - `CURSEFORGE_API_KEY` — optional; required for CurseForge integration.
-- `MAX_CONCURRENT_DOWNLOADS` — reserved for the download worker milestone.
 
 ## Planned next
 
