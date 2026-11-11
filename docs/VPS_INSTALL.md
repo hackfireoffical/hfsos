@@ -24,7 +24,7 @@ The installer:
 - Creates a restricted `hackfire` system account.
 - Creates a Python virtual environment and installs requirements.
 - Prompts for the Rubika token without echoing it.
-- Writes the token to a root-created, mode-600 local `.env` file.
+- Writes the token to a root-created, restricted root-owned `.env` file (readable only by the service group).
 - Installs and enables separate systemd services for the Rubika bot and localhost-only API.
 
 The installer never asks you to paste your token into a command or commit it to Git.
