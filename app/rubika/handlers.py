@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from app.providers import curseforge, github, modrinth, youtube
+from app.downloads import download_asset, split_for_rubika
+import hashlib
 from app.rubika.client import RubikaClient
 
 
@@ -39,6 +41,71 @@ async def handle_update(client: RubikaClient, update: dict) -> None:
 
     if lowered in {"/start", "start", "/help", "help"}:
         await client.send_message(chat_id, WELCOME)
+        return
+
+
+    if lowered.startswith("/download"):
+        parts = text.split()
+        if len(parts) < 3:
+            await client.send_message(
+                chat_id,
+                "Usage:\\n/download github owner/repo\\n/download modrinth project-slug\\n/download curseforge project-id file-id",
+            )
+            return
+        source = parts[1].lower()
+        try:
+            url = None
+            filename = None
+            expected_sha512 = None
+            if source == "github" and len(parts) == 3 and "/" in parts[2]:
+                owner, repository = parts[2].split("/", 1)
+                release = await github.latest_release(owner, repository)
+                assets = (release or {}).get("assets") or []
+                if not assets:
+                    await client.send_message(chat_id, "No downloadable asset exists in the latest release.")
+                    return
+                asset = assets[0]
+                url, filename = asset.get("download_url"), asset.get("name")
+            elif source == "modrinth" and len(parts) == 3:
+                versions = await modrinth.project_versions(parts[2], limit=1)
+                files = (versions[0].get("files") or []) if versions else []
+                chosen = next((item for item in files if item.get("primary")), files[0] if files else None)
+                if not chosen:
+                    await client.send_message(chat_id, "No downloadable file found for that Modrinth project.")
+                    return
+                url, filename, expected_sha512 = chosen.get("url"), chosen.get("filename"), chosen.get("sha512")
+            elif source == "curseforge" and len(parts) == 4:
+                files = await curseforge.list_files(int(parts[2]), limit=50)
+                chosen = next((item for item in files if str(item.get("id")) == parts[3]), None)
+                if not chosen or not chosen.get("download_url"):
+                    await client.send_message(chat_id, "That CurseForge file is unavailable for direct download.")
+                    return
+                url, filename = chosen.get("download_url"), chosen.get("file_name")
+            else:
+                await client.send_message(chat_id, "Invalid download command. Send /help for examples.")
+                return
+            if not url or not filename:
+                await client.send_message(chat_id, "The provider did not return a downloadable file.")
+                return
+            await client.send_message(chat_id, f"⬇️ Downloading {filename}…")
+            path = await download_asset(url, filename, expected_sha512)
+            parts_to_send = split_for_rubika(path)
+            sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+            if len(parts_to_send) > 1:
+                await client.send_message(
+                    chat_id,
+                    f"📦 {path.name} is larger than Rubika's 50 MB file limit. Sending {len(parts_to_send)} numbered parts.\\nSHA-256: {sha256}",
+                )
+            for index, part in enumerate(parts_to_send, 1):
+                caption = f"{path.name} · part {index}/{len(parts_to_send)}" if len(parts_to_send) > 1 else path.name
+                await client.send_file(chat_id, part, caption)
+            await client.send_message(chat_id, f"✅ Delivery complete: {path.name} ({path.stat().st_size / 1048576:.1f} MB).")
+            for part in parts_to_send:
+                if part != path:
+                    part.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
+        except Exception as exc:
+            await client.send_message(chat_id, f"⚠️ Download failed ({type(exc).__name__}). Check the provider/API key and try again.")
         return
 
     if lowered.startswith("/release"):
