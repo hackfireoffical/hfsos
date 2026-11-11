@@ -23,8 +23,11 @@ class RubikaClient:
         await self.client.aclose()
 
     async def call(self, method: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        response = await self.client.post(f"{self.base_url}/{method}", json=payload or {})
-        response.raise_for_status()
+        try:
+            response = await self.client.post(f"{self.base_url}/{method}", json=payload or {})
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise RubikaAPIError(f"Rubika API method {method} failed ({type(exc).__name__}).") from None
         body = response.json()
         if body.get("status") != "OK":
             # Do not include request URL: it contains the bot token.
@@ -59,17 +62,20 @@ class RubikaClient:
         upload_url = requested.get("upload_url")
         if not isinstance(upload_url, str) or not upload_url.startswith("https://"):
             raise RubikaAPIError("Rubika returned an invalid upload URL.")
-        with path.open("rb") as handle:
-            response = await self.client.post(
-                upload_url,
-                files={"file": (path.name, handle, "application/octet-stream")},
-                timeout=httpx.Timeout(180.0, connect=15.0),
-            )
-        response.raise_for_status()
-        uploaded = response.json()
-        if uploaded.get("status") != "OK":
+        try:
+            with path.open("rb") as handle:
+                response = await self.client.post(
+                    upload_url,
+                    files={"file": (path.name, handle, "application/octet-stream")},
+                    timeout=httpx.Timeout(180.0, connect=15.0),
+                )
+            response.raise_for_status()
+            uploaded = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise RubikaAPIError(f"Rubika file upload failed ({type(exc).__name__}).") from None
+        if uploaded.get("status") not in (None, "OK"):
             raise RubikaAPIError("Rubika file upload failed.")
-        file_id = (uploaded.get("data") or {}).get("file_id")
+        file_id = (uploaded.get("data") or uploaded).get("file_id")
         if not file_id:
             raise RubikaAPIError("Rubika upload response did not contain a file ID.")
         payload: dict[str, Any] = {"chat_id": chat_id, "file_id": file_id}
