@@ -6,7 +6,7 @@ HackFire Gateway downloads files only from URLs returned by supported provider A
 
 The official Rubika Bot API documents a two-step upload: call `requestSendFile` with type `File`, POST the file as multipart form data to the returned `upload_url`, then call `sendFile` with the returned `file_id`. The official enum documents a 50 MB maximum for general files and MP4 videos. HackFire Gateway uses a conservative 45 MiB part size so multipart overhead stays below that limit.
 
-Files larger than the Rubika cap are split into numbered `.partNNN` attachments. The bot sends a manifest with the original filename, part count, and SHA-256. The receiver can join the parts in order with a binary concatenation utility; the gateway does not silently truncate oversized files.
+Files larger than the Rubika cap are split into numbered `.partNNN` attachments. Each chat has a short download cooldown and a global semaphore limits simultaneous downloads. The bot sends a manifest with the original filename, part count, and SHA-256. The receiver can join the parts in order with a binary concatenation utility; the gateway does not silently truncate oversized files.
 
 ## Commands
 
