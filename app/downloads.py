@@ -113,7 +113,7 @@ def split_for_rubika(path: Path) -> list[Path]:
             part.unlink(missing_ok=True)
         raise
 
-def cleanup_download_cache(max_age_seconds: int = 3600) -> int:
+def cleanup_download_cache(max_age_seconds: int | None = None) -> int:
     """Delete abandoned UUID job directories older than the retention window.
 
     Completed deliveries are removed immediately by the handler. This sweep is
@@ -125,6 +125,8 @@ def cleanup_download_cache(max_age_seconds: int = 3600) -> int:
     root = Path(os.getenv("DOWNLOAD_DIR", "data/downloads")).resolve()
     if not root.exists():
         return 0
+    if max_age_seconds is None:
+        max_age_seconds = int(os.getenv("DOWNLOAD_ORPHAN_MAX_AGE_SECONDS", "3600"))
     now = time.time()
     removed = 0
     for entry in root.iterdir():
